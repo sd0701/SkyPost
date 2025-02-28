@@ -53,12 +53,13 @@ def get_email_body(msg):
 
     if msg.is_multipart():
         for part in msg.walk():
-            if part.get_content_type() == "text/plain":
+            content_type = part.get_content_type()
+            if content_type == "text/html":
                 return part.get_payload(decode=True).decode(errors="ignore")
     else:
         return msg.get_payload(decode=True).decode(errors="ignore")
 
-    return "No content"
+    return "No content available."
 
 def search_emails(query="", account=None, folder=None):
 
