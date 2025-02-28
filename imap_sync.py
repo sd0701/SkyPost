@@ -1,16 +1,14 @@
+import json
 from imapclient import IMAPClient
 
-# List of IMAP accounts
-IMAP_ACCOUNTS = [
-    {
-        "host": "imap.gmail.com", # Gmail IMAP host
-        "email": "sivadharshini0107@gmail.com",
-        "password": "fxbk cmdx psah ounl"
-    }
-]
+def load_accounts():
+    with open("accounts.json", "r") as file:
+        return json.load(file)
+
+IMAP_ACCOUNTS = load_accounts()
 
 def connect_imap(account):
-    """ Connect to an IMAP account and fetch recent emails """
+
     try:
         with IMAPClient(account["host"]) as client:
             client.login(account["email"], account["password"])
