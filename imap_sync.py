@@ -26,3 +26,4 @@ def connect_imap(account):
 if __name__ == "__main__":
     for acc in IMAP_ACCOUNTS:
         connect_imap(acc)
+#done
