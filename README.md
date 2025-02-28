@@ -5,3 +5,5 @@ Elastic search done
 To do:
 AI categorization
 Finish front end work
+Add instructions for setup
+Upload video
