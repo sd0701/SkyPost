@@ -5,7 +5,8 @@ import email
 
 es = Elasticsearch(
     ["http://localhost:9200"],
-    headers={"Content-Type": "application/json"}
+    headers={"Content-Type": "application/json"},
+    request_timeout=30
 )
 
 def load_accounts():
@@ -70,11 +71,12 @@ def search_emails(query="", account=None, folder=None):
     if folder:
         filters["bool"]["must"].append({"match": {"folder": folder}})
 
-    res = es.search(index="emails", body={"query": filters})
+    res = es.search(index="emails", body={"query": {"match_all": {}}})
     print(res["hits"]["hits"])
 
 if __name__ == "__main__":
     for acc in IMAP_ACCOUNTS:
         connect_imap(acc)
+    search_emails()
 
 #done
