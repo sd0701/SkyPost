@@ -72,7 +72,7 @@ def search_emails(query="", account=None, folder=None):
         filters["bool"]["must"].append({"match": {"folder": folder}})
 
     res = es.search(index="emails", body={"query": {"match_all": {}}})
-    print(res["hits"]["hits"])
+    return res["hits"]["hits"]
 
 if __name__ == "__main__":
     for acc in IMAP_ACCOUNTS:

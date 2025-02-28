@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Search</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Email Search</h1>
+
+    <input type="text" id="search" placeholder="Search emails...">
+
+    <select id="account">
+        <option value="">All Accounts</option>
+        {% for account in accounts %}
+            <option value="{{ account.email }}">{{ account.email }}</option>
+        {% endfor %}
+    </select>
+
+    <select id="folder">
+        <option value="">All Folders</option>
+        <option value="INBOX">Inbox</option>
+        <option value="Spam">Spam</option>
+    </select>
+
+    <button onclick="searchEmails()">Search</button>
+
+    <div id="results"></div>
+
+    <script>
+        function searchEmails() {
+            var query = $("#search").val();
+            var account = $("#account").val();
+            var folder = $("#folder").val();
+
+            $.get("/search", { q: query, account: account, folder: folder }, function(data) {
+                $("#results").empty();
+                if (data.length === 0) {
+                    $("#results").append("<p>No results found.</p>");
+                } else {
+                    data.forEach(function(email) {
+                        $("#results").append(`<div>
+                            <h3>${email.subject}</h3>
+                            <p><strong>From:</strong> ${email.from}</p>
+                            <p><strong>Category:</strong> ${email.category}</p>
+                            <p>${email.body}</p>
+                            <hr>
+                        </div>`);
+                    });
+                }
+            });
+        }
+    </script>
+</body>
+</html>
