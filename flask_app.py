@@ -1,47 +1,56 @@
 from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO
 from elasticsearch import Elasticsearch
-import json
 
 app = Flask(__name__)
+socketio = SocketIO(app)
+
+
 es = Elasticsearch(["http://localhost:9200"])
 
 
-# Load IMAP accounts from JSON
-def load_accounts():
-    with open("accounts.json", "r") as file:
-        return json.load(file)
-
-
-IMAP_ACCOUNTS = load_accounts()
-
-
-@app.route("/", methods=["GET"])
+@app.route('/')
 def index():
-    """Render the search page with email accounts."""
-    return render_template("index.html", accounts=IMAP_ACCOUNTS)
+    return render_template('index.html')
 
 
-@app.route("/search", methods=["GET"])
-def search_emails():
-    """Search emails using Elasticsearch with filters."""
-    query = request.args.get("q", "")
-    account = request.args.get("account", "")
-    folder = request.args.get("folder", "")
+@app.route('/search', methods=['GET'])
+def search():
+    query = request.args.get('q', '')
+    account = request.args.get('account', 'all')
 
-    filters = {"bool": {"must": []}}
+    search_body = {
+        "query": {
+            "bool": {
+                "must": [{"match": {"content": query}}] if query else [],
+                "filter": [{"term": {"account": account}}] if account != 'all' else []
+            }
+        }
+    }
 
-    if query:
-        filters["bool"]["must"].append({"match": {"body": query}})
-    if account:
-        filters["bool"]["must"].append({"match": {"account": account}})
-    if folder:
-        filters["bool"]["must"].append({"match": {"folder": folder}})
-
-    res = es.search(index="emails", body={"query": filters})
+    res = es.search(index="emails", body=search_body)
     emails = [hit["_source"] for hit in res["hits"]["hits"]]
-
     return jsonify(emails)
 
 
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+@app.route('/emails', methods=['GET'])
+def get_emails():
+    res = es.search(index="emails", body={"query": {"match_all": {}}})
+    emails = [hit["_source"] for hit in res["hits"]["hits"]]
+    return jsonify(emails)
+
+
+@socketio.on('connect')
+def handle_connect():
+    print("Client connected")
+
+
+@socketio.on('fetch_emails')
+def fetch_emails():
+    res = es.search(index="emails", body={"query": {"match_all": {}}})
+    emails = [hit["_source"] for hit in res["hits"]["hits"]]
+    socketio.emit('new_emails', emails)
+
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True)

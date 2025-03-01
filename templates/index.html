@@ -3,54 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Search</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <title>SkyPost - Email Search</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script defer src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
 <body>
-    <h1>Email Search</h1>
-
-    <input type="text" id="search" placeholder="Search emails...">
-
-    <select id="account">
-        <option value="">All Accounts</option>
-        {% for account in accounts %}
-            <option value="{{ account.email }}">{{ account.email }}</option>
-        {% endfor %}
-    </select>
-
-    <select id="folder">
-        <option value="">All Folders</option>
-        <option value="INBOX">Inbox</option>
-        <option value="Spam">Spam</option>
-    </select>
-
-    <button onclick="searchEmails()">Search</button>
-
-    <div id="results"></div>
-
-    <script>
-        function searchEmails() {
-            var query = $("#search").val();
-            var account = $("#account").val();
-            var folder = $("#folder").val();
-
-            $.get("/search", { q: query, account: account, folder: folder }, function(data) {
-                $("#results").empty();
-                if (data.length === 0) {
-                    $("#results").append("<p>No results found.</p>");
-                } else {
-                    data.forEach(function(email) {
-                        $("#results").append(`<div>
-                            <h3>${email.subject}</h3>
-                            <p><strong>From:</strong> ${email.from}</p>
-                            <p><strong>Category:</strong> ${email.category}</p>
-                            <p>${email.body}</p>
-                            <hr>
-                        </div>`);
-                    });
-                }
-            });
-        }
-    </script>
+    <div class="container">
+        <div class="sidebar">
+            <h1 class="logo">SkyPost</h1>
+            <select id="accountSelector">
+                <option value="all">All Accounts</option>
+                {% for account in accounts %}
+                    <option value="{{ account['email'] }}">{{ account['email'] }}</option>
+                {% endfor %}
+            </select>
+            <ul id="folderList">
+                <li data-folder="inbox" class="active">Inbox</li>
+                <li data-folder="interested">Interested</li>
+                <li data-folder="meeting_booked">Meeting Booked</li>
+                <li data-folder="not_interested">Not Interested</li>
+                <li data-folder="spam">Spam</li>
+                <li data-folder="out_of_office">Out of Office</li>
+            </ul>
+        </div>
+        <div class="main">
+            <header>
+                <div class="search-container">
+                    <input type="text" id="searchBar" placeholder="Search emails...">
+                    <button id="searchButton">Search</button>
+                </div>
+            </header>
+            <div id="emailList" class="email-list"></div>
+        </div>
+    </div>
 </body>
 </html>
