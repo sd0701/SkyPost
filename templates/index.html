@@ -39,5 +39,37 @@
 
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
+<script>
+    const socket = io.connect('http://localhost:5000');
+
+    socket.on('connect', () => {
+        console.log(" Connected to Server");
+        socket.emit('fetch_emails');
+    });
+
+    socket.on('new_emails', (emails) => {
+        console.log(" New Emails Arrived", emails);
+        updateEmails(emails);
+    });
+
+    function updateEmails(emails) {
+        let container = document.getElementById("emailList");
+        container.innerHTML = "";
+
+        emails.forEach(email => {
+            let emailHTML = `
+                <div class="email">
+                    <h3>${email.subject}</h3>
+                    <p>From: ${email.from}</p>
+                    <p>Date: ${email.date}</p>
+                    <p>Category: ${email.category}</p>
+                </div>
+            `;
+            container.innerHTML += emailHTML;
+        });
+    }
+</script>
+
 </body>
 </html>
