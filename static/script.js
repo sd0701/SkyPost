@@ -7,18 +7,24 @@ document.addEventListener("DOMContentLoaded", function () {
     const searchButton = document.getElementById("searchButton");
     const emailList = document.getElementById("emailList");
 
-    let selectedCategory = "inbox";  // Default category
+    let selectedCategory = "inbox";
 
     if (!accountSelector) {
         console.error("Error: 'accountSelector' not found in the DOM.");
         return;
     }
 
+    function sanitizeHTML(html) {
+        let tempDiv = document.createElement("div");
+        tempDiv.innerHTML = html;
+        return tempDiv.textContent || tempDiv.innerText || "";
+    }
+
     function populateAccountDropdown() {
         fetch("/accounts")
             .then(response => response.json())
             .then(accounts => {
-                console.log("Fetched Accounts:", accounts);  // Debugging
+                console.log("Fetched Accounts:", accounts);
                 accountSelector.innerHTML = '<option value="all">All Accounts</option>';
                 accounts.forEach(account => {
                     const option = document.createElement("option");
@@ -30,17 +36,28 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(error => console.error("Error fetching accounts:", error));
     }
 
-    function fetchEmails(account = "all", category = "inbox", query = "") {
-        let url = query
-            ? `/search?q=${encodeURIComponent(query)}&account=${account}&category=${category}`
-            : `/emails?account=${account}&category=${category}`;
 
-        console.log("Fetching emails from:", url); // Debugging
+function decodeEmailSubject(encodedSubject) {
+    try {
+        return decodeURIComponent(escape(atob(encodedSubject.split("?B?")[1].split("?=")[0])));
+    } catch (error) {
+        return encodedSubject;
+    }
+}
+// function removeStyles(html) {
+//     return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");  // Removes all <style> tags
+// }
+    function fetchEmails(account = "all", folder = "inbox", query = "") {
+        let url = query
+            ? `/search?q=${encodeURIComponent(query)}&account=${account}&category=${folder}`
+            : `/emails?account=${account}&category=${folder}`;
+
+        console.log("Fetching emails from:", url);
 
         fetch(url)
             .then(response => response.json())
             .then(data => {
-                emailList.innerHTML = "";  // Clear list before adding new emails
+                emailList.innerHTML = ""; // Clear list
 
                 if (data.length === 0) {
                     emailList.innerHTML = "<p>No emails found.</p>";
@@ -48,6 +65,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
 
                 data.forEach(email => {
+                    // let cleanBody = removeStyles(email.body);
+                    let displayCategory = email.ai_category || "Uncategorized";
+
                     const emailItem = document.createElement("div");
                     emailItem.classList.add("email-item");
                     emailItem.innerHTML = `
@@ -55,16 +75,19 @@ document.addEventListener("DOMContentLoaded", function () {
                             <img src="${email.profile_image || '/static/profile.jpg'}" alt="Profile" class="profile-pic">
                             <div class="email-info">
                                 <strong>${email["from"] || "Unknown Sender"}</strong>  
-                                <span>${email.subject || "No Subject"}</span>  
+                                <span>${decodeEmailSubject(email.subject) || "No Subject"}</span>  
+ 
                             </div>
                             <div class="email-time">${email.date || "No Date"}</div>  
-                            <div class="email-category">${email.category || "Uncategorized"}</div>  
+                            ${displayCategory ? `<div class="email-category">${displayCategory}</div>` : ""}
                         </div>
-                        <div class="email-content">${email.body || "No Content Available"}</div> 
+                        <div class="email-content">${email.body ? email.body : "No Content Available"}</div>                            
                     `;
 
                     emailList.appendChild(emailItem);
+
                 });
+                document.getElementById(`email-body-${email.id}`).textContent = email.body;
             })
             .catch(error => console.error("Error fetching emails:", error));
     }
@@ -77,7 +100,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Handle category clicks from the left sidebar
     folderList.addEventListener("click", (event) => {
         if (event.target.tagName === "LI") {
             document.querySelector("#folderList .active")?.classList.remove("active");
@@ -88,14 +110,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    // Handle account selection change
     accountSelector.addEventListener("change", () => {
         const selectedAccount = accountSelector.value;
-        console.log("Selected Account:", selectedAccount); // Debugging
+        console.log("Selected Account:", selectedAccount);
         fetchEmails(selectedAccount, selectedCategory);
     });
 
-    // Handle search
     if (searchButton) {
         searchButton.addEventListener("click", () => {
             fetchEmails(accountSelector.value, selectedCategory, searchBar.value);
@@ -104,7 +124,6 @@ document.addEventListener("DOMContentLoaded", function () {
         console.error("Error: 'searchButton' not found in the DOM.");
     }
 
-    // Populate account dropdown and load initial emails
     populateAccountDropdown();
     fetchEmails();
 });
