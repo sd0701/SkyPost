@@ -22,7 +22,6 @@ if not api_key:
 # Initialize OpenAI client
 client = OpenAI(api_key=api_key)
 
-
 es = Elasticsearch(
     ["http://localhost:9200"],
     headers={"Content-Type": "application/json"}
