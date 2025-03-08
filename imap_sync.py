@@ -16,7 +16,7 @@ es = Elasticsearch(
     headers={"Content-Type": "application/json"}
 )
 
-
+#opening the json file
 def load_accounts():
     with open("accounts.json", "r") as file:
         return json.load(file)
@@ -42,10 +42,10 @@ def get_email_body(msg):
 
     return "No content available."
 
-
+#processing new emails from March 1 for AI categorization
 def process_new_emails(account, client):
     client.select_folder("INBOX")
-    messages = client.search(["SINCE", "01-Mar-2025"])  # Only categorize emails from March 1 onward
+    messages = client.search(["SINCE", "01-Mar-2025"])
 
     for msg_id in messages:
         raw_message = client.fetch([msg_id], ["RFC822"])[msg_id][b"RFC822"]
@@ -77,7 +77,7 @@ def process_new_emails(account, client):
         except Exception as e:
             print(f" Failed to notify Flask app: {e}")
 
-
+#for updating with new emails
 def idle_imap(account):
     while True:
         try:
@@ -98,7 +98,7 @@ def idle_imap(account):
             print(f" Error in IMAP IDLE for {account['email']}: {e}")
             time.sleep(10)
 
-
+#for the AI Categorization
 def categorize_email(body, subject):
     prompt = f"""
     Categorize this email into one of the following:
@@ -125,14 +125,14 @@ def categorize_email(body, subject):
         print(f" OpenAI categorization failed: {e}")
         return "Uncategorized"
 
-
+#for getting the old emails from Jan of 2025
 def fetch_old_emails(account):
     try:
         with IMAPClient(account["host"]) as client:
             client.login(account["email"], account["password"])
             client.select_folder("INBOX")
 
-            messages = client.search(["SINCE", "01-Jan-2025"])  # Fetch all emails for inbox display
+            messages = client.search(["SINCE", "01-Jan-2025"])
 
             for msg_id in messages:
                 raw_message = client.fetch([msg_id], ["RFC822"])[msg_id][b"RFC822"]
@@ -149,7 +149,7 @@ def fetch_old_emails(account):
                     "folder": "inbox",
                     "account": account["email"],
                     "body": email_body,
-                    "ai_category": "inbox"  # Ensuring all emails appear in the inbox by default
+                    "ai_category": "inbox"
                 }
 
                 es.index(index="emails", id=msg_id, document=email_data)
@@ -157,7 +157,7 @@ def fetch_old_emails(account):
     except Exception as e:
         print(f" Error fetching old emails for {account['email']}: {e}")
 
-
+#main part of code
 if __name__ == "__main__":
     for acc in IMAP_ACCOUNTS:
         fetch_old_emails(acc)
