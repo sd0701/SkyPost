@@ -6,8 +6,21 @@ import time
 from threading import Thread
 import requests
 import re
-import openai
 from bs4 import BeautifulSoup
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get API key
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    raise ValueError("Missing OpenAI API key. Set OPENAI_API_KEY in the .env file.")
+
+# Initialize OpenAI client
+client = OpenAI(api_key=api_key)
 
 
 es = Elasticsearch(

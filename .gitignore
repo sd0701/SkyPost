@@ -23,3 +23,4 @@ Scripts/
 share/
 Tools/
 etc/
+.env
