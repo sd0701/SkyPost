@@ -9,7 +9,6 @@ import re
 import openai
 from bs4 import BeautifulSoup
 
-openai.api_key = "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"
 
 es = Elasticsearch(
     ["http://localhost:9200"],
