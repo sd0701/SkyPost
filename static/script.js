@@ -1,3 +1,4 @@
+// javascript for making the webpage interactive
 document.addEventListener("DOMContentLoaded", function () {
     console.log("DOM fully loaded");
 

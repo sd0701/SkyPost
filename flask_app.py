@@ -19,7 +19,7 @@ def filter_recent_emails(emails):
             if email_date >= cutoff_date:
                 filtered.append(email)
         except ValueError:
-            pass  # Skip emails with invalid dates
+            pass
     return filtered
 
 
@@ -75,7 +75,7 @@ def get_emails():
     query_body = {"query": {"match_all": {}}} if account == "all" else {
         "query": {"match": {"account": account}}
     }
-
+    #if the email comes under any AI category, it will be displayed when the category is selected from the sidebar
     if category and category != "inbox":
         query_body["query"] = {
             "bool": {
