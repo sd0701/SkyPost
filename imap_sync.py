@@ -9,7 +9,6 @@ import re
 import openai
 from bs4 import BeautifulSoup
 
-openai.api_key = ***REMOVED***
 
 es = Elasticsearch(
     ["http://localhost:9200"],
