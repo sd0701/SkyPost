@@ -5,8 +5,8 @@ import json
 from datetime import datetime
 
 app = Flask(__name__)
-socketio = SocketIO(app)
 
+socketio = SocketIO(app, cors_allowed_origins="*")
 es = Elasticsearch(["http://localhost:9200"])
 
 
@@ -37,58 +37,67 @@ def index():
     return render_template('index.html', accounts=accounts)
 
 
-@app.route('/search', methods=['GET'])
-def search():
-    query = request.args.get('q', '')
-    account = request.args.get('account', 'all')
-    category = request.args.get('ai_category', '')
+@app.route('/search')
+def search_emails():
+    query = request.args.get("q", "").strip()
+    account = request.args.get("account", "all")
+    category = request.args.get("category", "all")
 
-    # Build Elasticsearch query
-    search_query = {
-        "query": {
-            "bool": {
-                "must": [{"match": {"content": query}}] if query else [],
-                "filter": []
-            }
+    # Ensure query is not empty before making the search
+    if not query:
+        return jsonify([])
+
+    es_query = {
+        "bool": {
+            "should": [
+                {"multi_match": {
+                    "query": query,
+                    "fields": ["from", "subject", "body"]
+                }}
+            ]
         }
     }
 
-    if account != 'all':
-        search_query["query"]["bool"]["filter"].append({"term": {"account.keyword": account}})
+    if account != "all":
+        es_query["bool"]["should"].append({"match": {"account": account}})
 
-    if category:
-        search_query["query"]["bool"]["filter"].append({"term": {"ai_category.keyword": category}})
+    if category != "all":
+        es_query["bool"]["should"].append({"match": {"category": category}})
 
     try:
-        res = es.search(index="emails", query=search_query["query"])
-        emails = [hit["_source"] for hit in res["hits"]["hits"]]
+        result = es.search(index="emails", body={"query": es_query})
+        emails = [hit["_source"] for hit in result["hits"]["hits"]]
         return jsonify(emails)
     except Exception as e:
-        print(f"Error searching emails: {e}")
-        return jsonify({"error": "Failed to fetch emails"}), 500
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/emails', methods=['GET'])
 def get_emails():
     account = request.args.get("account", "all")
     category = request.args.get("category", None)
 
-    query_body = {"query": {"match_all": {}}} if account == "all" else {
-        "query": {"match": {"account": account}}
-    }
-    #if the email comes under any AI category, it will be displayed when the category is selected from the sidebar
+    # Define query structure
+    query_body = {"bool": {"must": []}}
+
+    # If account is specified, filter by account
+    if account != "all":
+        query_body["bool"]["must"].append({"match": {"account": account}})
+
+    # If category is selected and not "inbox", filter by AI category
     if category and category != "inbox":
-        query_body["query"] = {
-            "bool": {
-                "must": [query_body["query"], {"term": {"ai_category": category}}]
-            }
-        }
+        query_body["bool"]["must"].append({"term": {"ai_category": category}})
+
     try:
-        response = es.search(index="emails", query=query_body["query"], size=1000)
+        # Ensure query follows correct format
+        response = es.search(index="emails", body={"query": query_body}, size=1000)
+
         emails = [
             {**hit["_source"], "profile_image": hit["_source"].get("profile_image", "/static/profile.jpg")}
             for hit in response["hits"]["hits"]
         ]
 
+        # If category is applied (except "inbox"), filter recent emails
         if category and category != "inbox":
             emails = filter_recent_emails(emails)
 
@@ -97,17 +106,16 @@ def get_emails():
         print("Error fetching emails:", e)
         return jsonify({"error": "Failed to fetch emails"}), 500
 
-
 @socketio.on('connect')
 def handle_connect():
-    print("Client connected")
+    print("Client connected to WebSocket")
 
 
 @socketio.on('fetch_emails')
 def fetch_emails():
     print("Fetching updated emails...")
     try:
-        res = es.search(index="emails", query= {"match_all": {}}, size=1000)
+        res = es.search(index="emails", body={"query": {"match_all": {}}}, size=1000)
         emails = [hit["_source"] for hit in res["hits"]["hits"]]
         socketio.emit('new_emails', emails)
     except Exception as e:
@@ -118,7 +126,7 @@ def fetch_emails():
 def trigger_update():
     print("Received new email update request. Fetching latest emails...")
     try:
-        res = es.search(index="emails", query={"match_all": {}}, size=1000)
+        res = es.search(index="emails", body={"query": {"match_all": {}}}, size=1000)
         emails = [hit["_source"] for hit in res["hits"]["hits"]]
         socketio.emit('new_emails', emails)
         print(f"UI updated with {len(emails)} emails.")
@@ -129,4 +137,4 @@ def trigger_update():
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True, use_reloader=False)

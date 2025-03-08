@@ -117,9 +117,17 @@ header {
     padding: 10px;
     border: none;
     outline: none;
-    background: transparent;
-    color: black;
+    background: rgba(255, 255, 255, 0.93);
+    color: #424141;
+    border-radius: 20px;
 }
+/*#searchBar::placeholder {*/
+/*    color: rgba(255, 255, 255, 0.7); !* Light placeholder for better visibility *!*/
+/*}*/
+
+/*#searchBar:focus {*/
+/*    background: rgba(0, 0, 0, 0.5); !* Slightly darker when focused *!*/
+/*}*/
 
 #searchButton {
     flex: 1;

@@ -1,4 +1,39 @@
 // javascript for making the webpage interactive
+const socket = io.connect("http://localhost:5000");  // Adjust port if needed
+
+socket.on("connect", () => {
+    console.log("WebSocket connected!");
+});
+
+socket.on("new_emails", (emails) => {
+    console.log("Received new emails:", emails);
+    updateEmailList(emails);  // Function to update UI
+});
+
+function updateEmails(emails) {
+    let container = document.getElementById("emailList");
+
+    // Track already displayed emails to avoid duplicates
+    let existingEmails = new Set();
+    container.querySelectorAll('.email').forEach(emailDiv => {
+        existingEmails.add(emailDiv.getAttribute('data-id'));
+    });
+
+    emails.forEach(email => {
+        if (!existingEmails.has(email.id)) {
+            let emailHTML = `
+                <div class="email" data-id="${email.id}">
+                    <h3>${email.subject}</h3>
+                    <p>From: ${email.from}</p>
+                    <p>Date: ${email.date}</p>
+                    <p>Category: ${email.category}</p>
+                </div>
+            `;
+            container.innerHTML += emailHTML;
+        }
+    });
+}
+
 document.addEventListener("DOMContentLoaded", function () {
     console.log("DOM fully loaded");
 
@@ -108,6 +143,7 @@ function decodeEmailSubject(encodedSubject) {
 
             selectedCategory = event.target.dataset.folder;
             fetchEmails(accountSelector.value, selectedCategory);
+            socket.emit("fetch_emails");
         }
     });
 
@@ -115,11 +151,13 @@ function decodeEmailSubject(encodedSubject) {
         const selectedAccount = accountSelector.value;
         console.log("Selected Account:", selectedAccount);
         fetchEmails(selectedAccount, selectedCategory);
+        socket.emit("fetch_emails");
     });
 
     if (searchButton) {
         searchButton.addEventListener("click", () => {
             fetchEmails(accountSelector.value, selectedCategory, searchBar.value);
+            socket.emit("fetch_emails");
         });
     } else {
         console.error("Error: 'searchButton' not found in the DOM.");
@@ -127,4 +165,5 @@ function decodeEmailSubject(encodedSubject) {
 
     populateAccountDropdown();
     fetchEmails();
+    socket.emit("fetch_emails");
 });
