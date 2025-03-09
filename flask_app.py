@@ -6,14 +6,13 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# ✅ FIXED: Removed async_mode, let Flask-SocketIO decide
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Connect to Elasticsearch
 es = Elasticsearch(["http://localhost:9200"])
 
 def filter_recent_emails(emails):
-    """Filters emails to show only recent ones (from March 1, 2024)."""
+    #filtering emails from jan 2025
     cutoff_date = datetime(2024, 3, 1)
     filtered = []
     for email in emails:
@@ -26,7 +25,6 @@ def filter_recent_emails(emails):
     return filtered
 @app.route('/accounts', methods=['GET'])
 def get_accounts():
-    """Returns a list of email accounts from JSON file."""
     with open("accounts.json", "r") as file:
         accounts = json.load(file)
     return jsonify(accounts)
@@ -34,7 +32,6 @@ def get_accounts():
 
 @app.route('/')
 def index():
-    """Loads the main page with email accounts."""
     with open("accounts.json", "r") as file:
         accounts = json.load(file)
     return render_template('index.html', accounts=accounts)
@@ -42,7 +39,7 @@ def index():
 
 @app.route('/search')
 def search_emails():
-    """Searches emails using Elasticsearch based on user query."""
+    #for search with elasticsearch
     query = request.args.get("q", "").strip()
     account = request.args.get("account", "all")
     category = request.args.get("category", "all")
@@ -68,7 +65,7 @@ def search_emails():
 
 @app.route('/emails', methods=['GET'])
 def get_emails():
-    """Fetches emails from Elasticsearch and filters them."""
+    #getting emails from elasticsearch
     account = request.args.get("account", "all")
     category = request.args.get("category", None)
 
@@ -98,13 +95,11 @@ def get_emails():
 
 @socketio.on('connect')
 def handle_connect():
-    """Handles WebSocket connections."""
     print("Client connected to WebSocket")
 
 
 @socketio.on('fetch_emails')
 def fetch_emails():
-    """Fetches emails and sends updates to the frontend."""
     print("Fetching updated emails...")
     try:
         res = es.search(index="emails", body={"query": {"match_all": {}}}, size=1000)
@@ -116,7 +111,6 @@ def fetch_emails():
 
 @app.route('/trigger_update', methods=['POST'])
 def trigger_update():
-    """Fetches the latest emails and notifies the frontend."""
     print("Received new email update request. Fetching latest emails...")
     try:
         res = es.search(index="emails", body={"query": {"match_all": {}}}, size=1000)
@@ -130,4 +124,4 @@ def trigger_update():
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, use_reloader=False)  # ✅ FIXED: Disabled reloader to prevent duplicate threads.
+    socketio.run(app, debug=True, use_reloader=False)

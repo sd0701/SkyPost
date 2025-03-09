@@ -22,7 +22,6 @@ es = Elasticsearch(
 
 
 def load_accounts():
-    """Load email accounts from a JSON file."""
     with open("accounts.json", "r") as file:
         return json.load(file)
 

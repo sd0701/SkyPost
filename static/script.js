@@ -1,5 +1,5 @@
 // javascript for making the webpage interactive
-const socket = io.connect("http://localhost:5000");  // Adjust port if needed
+const socket = io.connect("http://localhost:5000");
 
 socket.on("connect", () => {
     console.log("WebSocket connected!");
@@ -80,9 +80,6 @@ function decodeEmailSubject(encodedSubject) {
         return encodedSubject;
     }
 }
-// function removeStyles(html) {
-//     return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");  // Removes all <style> tags
-// }
     function fetchEmails(account = "all", folder = "inbox", query = "") {
         let url = query
             ? `/search?q=${encodeURIComponent(query)}&account=${account}&category=${folder}`
