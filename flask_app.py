@@ -6,11 +6,14 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# ✅ FIXED: Removed async_mode, let Flask-SocketIO decide
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Connect to Elasticsearch
 es = Elasticsearch(["http://localhost:9200"])
 
-
 def filter_recent_emails(emails):
+    """Filters emails to show only recent ones (from March 1, 2024)."""
     cutoff_date = datetime(2024, 3, 1)
     filtered = []
     for email in emails:
@@ -21,10 +24,9 @@ def filter_recent_emails(emails):
         except ValueError:
             pass
     return filtered
-
-
 @app.route('/accounts', methods=['GET'])
 def get_accounts():
+    """Returns a list of email accounts from JSON file."""
     with open("accounts.json", "r") as file:
         accounts = json.load(file)
     return jsonify(accounts)
@@ -32,6 +34,7 @@ def get_accounts():
 
 @app.route('/')
 def index():
+    """Loads the main page with email accounts."""
     with open("accounts.json", "r") as file:
         accounts = json.load(file)
     return render_template('index.html', accounts=accounts)
@@ -39,24 +42,15 @@ def index():
 
 @app.route('/search')
 def search_emails():
+    """Searches emails using Elasticsearch based on user query."""
     query = request.args.get("q", "").strip()
     account = request.args.get("account", "all")
     category = request.args.get("category", "all")
 
-    # Ensure query is not empty before making the search
     if not query:
         return jsonify([])
 
-    es_query = {
-        "bool": {
-            "should": [
-                {"multi_match": {
-                    "query": query,
-                    "fields": ["from", "subject", "body"]
-                }}
-            ]
-        }
-    }
+    es_query = {"bool": {"should": [{"multi_match": {"query": query, "fields": ["from", "subject", "body"]}}]}}
 
     if account != "all":
         es_query["bool"]["should"].append({"match": {"account": account}})
@@ -74,30 +68,25 @@ def search_emails():
 
 @app.route('/emails', methods=['GET'])
 def get_emails():
+    """Fetches emails from Elasticsearch and filters them."""
     account = request.args.get("account", "all")
     category = request.args.get("category", None)
 
-    # Define query structure
     query_body = {"bool": {"must": []}}
 
-    # If account is specified, filter by account
     if account != "all":
         query_body["bool"]["must"].append({"match": {"account": account}})
 
-    # If category is selected and not "inbox", filter by AI category
     if category and category != "inbox":
         query_body["bool"]["must"].append({"term": {"ai_category": category}})
 
     try:
-        # Ensure query follows correct format
         response = es.search(index="emails", body={"query": query_body}, size=1000)
-
         emails = [
             {**hit["_source"], "profile_image": hit["_source"].get("profile_image", "/static/profile.jpg")}
             for hit in response["hits"]["hits"]
         ]
 
-        # If category is applied (except "inbox"), filter recent emails
         if category and category != "inbox":
             emails = filter_recent_emails(emails)
 
@@ -106,13 +95,16 @@ def get_emails():
         print("Error fetching emails:", e)
         return jsonify({"error": "Failed to fetch emails"}), 500
 
+
 @socketio.on('connect')
 def handle_connect():
+    """Handles WebSocket connections."""
     print("Client connected to WebSocket")
 
 
 @socketio.on('fetch_emails')
 def fetch_emails():
+    """Fetches emails and sends updates to the frontend."""
     print("Fetching updated emails...")
     try:
         res = es.search(index="emails", body={"query": {"match_all": {}}}, size=1000)
@@ -124,6 +116,7 @@ def fetch_emails():
 
 @app.route('/trigger_update', methods=['POST'])
 def trigger_update():
+    """Fetches the latest emails and notifies the frontend."""
     print("Received new email update request. Fetching latest emails...")
     try:
         res = es.search(index="emails", body={"query": {"match_all": {}}}, size=1000)
@@ -137,4 +130,4 @@ def trigger_update():
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, use_reloader=False)
+    socketio.run(app, debug=True, use_reloader=False)  # ✅ FIXED: Disabled reloader to prevent duplicate threads.

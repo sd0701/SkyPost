@@ -1,27 +1,28 @@
 import json
-from imapclient import IMAPClient
-from elasticsearch import Elasticsearch
 import email
 import time
 from threading import Thread
 import requests
-import re
-import openai
-from bs4 import BeautifulSoup
 
+from bs4 import BeautifulSoup
 import ssl
 import certifi
 import imaplib
+from imapclient import IMAPClient
+from elasticsearch import Elasticsearch
 
-openai.api_key = "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"
+from transformers import pipeline
+classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
 
 es = Elasticsearch(
     ["http://localhost:9200"],
     headers={"Content-Type": "application/json"}
 )
 
-def load_accounts():
 
+def load_accounts():
+    """Load email accounts from a JSON file."""
     with open("accounts.json", "r") as file:
         return json.load(file)
 
@@ -30,7 +31,7 @@ IMAP_ACCOUNTS = load_accounts()
 
 
 def get_email_body(msg):
-
+    #handles plain text and html
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()
@@ -41,7 +42,7 @@ def get_email_body(msg):
 
             elif content_type == "text/html" and "attachment" not in content_disposition:
                 html_content = part.get_payload(decode=True).decode(errors="ignore")
-                return BeautifulSoup(html_content, "html.parser").get_text()
+                return BeautifulSoup(html_content, "html.parser").get_text()  # Extract text from HTML
     else:
         return msg.get_payload(decode=True).decode(errors="ignore")
 
@@ -49,6 +50,7 @@ def get_email_body(msg):
 
 
 def process_new_emails(account, client):
+    #getting new emails
     client.select_folder("INBOX")
     messages = client.search(["SINCE", "01-Mar-2025"])  # Only categorize emails from March 1 onward
 
@@ -60,7 +62,7 @@ def process_new_emails(account, client):
         email_body = get_email_body(msg)
 
         category = categorize_email(email_body, email_subject)
-        print(category)
+        print(f"Categorized as {category}")
 
         email_data = {
             "email_id": msg_id,
@@ -76,75 +78,71 @@ def process_new_emails(account, client):
         es.index(index="emails", id=msg_id, document=email_data)
         es.indices.refresh(index="emails")
 
-        print(f" New email categorized as {category}: {email_subject}")
+        print(f"New email categorized as {category}: {email_subject}")
 
         try:
             requests.post("http://localhost:5000/trigger_update")
         except Exception as e:
-            print(f" Failed to notify Flask app: {e}")
+            print(f"Failed to notify Flask app: {e}")
 
 
 def idle_imap(account):
+    #imap idle listens for new emails
     while True:
         try:
             with IMAPClient(account["host"], ssl_context=ssl.create_default_context(cafile=certifi.where())) as client:
                 client.login(account["email"], account["password"])
                 client.select_folder("INBOX")
 
-                print(f" Listening for new emails in {account['email']}...")
+                print(f"Listening for new emails in {account['email']}...")
 
                 while True:
-                    client.idle()
-                    responses = client.idle_check(timeout=60)
-                    client.idle_done()
+                    try:
+                        client.idle()
+                        responses = client.idle_check(timeout=60)  # Check for new emails every 60 seconds
+                        client.idle_done()
 
-                    if responses:
-                        process_new_emails(account, client)
+                        if responses:
+                            process_new_emails(account, client)
+
+                    except imaplib.IMAP4.abort:
+                        print("Connection to the server was closed unexpectedly.")
+                        break  # Reconnect after breaking out of the loop
+                    except Exception as e:
+                        print(f"Error in IDLE loop: {e}")
+                        break  # Exit the loop and attempt to reconnect
 
         except Exception as e:
-            print(f" Error in IMAP IDLE for {account['email']}: {e}")
-            time.sleep(10)
-
+            print(f"Error in IMAP IDLE for {account['email']}: {e}")
+            time.sleep(5)  # Retry after some delay
 
 def categorize_email(body, subject):
+    #categorization using hugging face
 
-    prompt = f"""
-    Categorize this email into one of the following:
-    - Interested
-    - Meeting Booked
-    - Not Interested
-    - Spam
-    - Out of Office
+    categories = ["Interested", "Meeting Booked", "Not Interested", "Spam", "Out of Office", "Uncategorized"]
 
-    Subject: {subject}
-    body: {body}
-
-    Respond with only the category name.
-    """
+    email_text = f"Subject: {subject}\n\n{body[:500]}"  # Limit text for processing
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": prompt}],
-        )
-        category_of_ai = response.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-        if category_of_ai:
-            print(f"Categorized as: {category_of_ai}")
-            return category_of_ai
-        else:
-            raise ValueError("Empty response from OpenAI")
+        result = classifier(email_text, candidate_labels=categories)
+        category = result["labels"][0]
+
+        print(f"Categorized Email: {category}")
+        return category
 
     except Exception as e:
-        print(f" OpenAI categorization failed: {e}")
+        print(f"Error in categorization: {e}")
         return "Uncategorized"
 
+
 def fetch_old_emails(account):
+    #gets old emails and categorizes them
     try:
         with IMAPClient(account["host"]) as client:
             client.login(account["email"], account["password"])
             client.select_folder("INBOX")
 
-            messages = client.search(["SINCE", "01-Jan-2025"])  # Fetch all emails for inbox display
+            messages = client.search(["SINCE", "01-Jan-2025"])  # Fetch all emails from Jan 2025 onwards
 
             for msg_id in messages:
                 raw_message = client.fetch([msg_id], ["RFC822"])[msg_id][b"RFC822"]
@@ -152,6 +150,8 @@ def fetch_old_emails(account):
 
                 email_subject = msg["subject"] if msg["subject"] else "(No Subject)"
                 email_body = get_email_body(msg)
+
+                category = categorize_email(email_body, email_subject)
 
                 email_data = {
                     "email_id": msg_id,
@@ -161,15 +161,19 @@ def fetch_old_emails(account):
                     "folder": "inbox",
                     "account": account["email"],
                     "body": email_body,
-                    "ai_category": "inbox"  # Ensuring all emails appear in the inbox by default
+                    "ai_category": category
                 }
 
                 es.index(index="emails", id=msg_id, document=email_data)
                 es.indices.refresh(index="emails")
+
+                print(f"Fetched old email categorized as {category}: {email_subject}")
+
     except Exception as e:
-        print(f" Error fetching old emails for {account['email']}: {e}")
+        print(f"Error fetching old emails for {account['email']}: {e}")
 
 if __name__ == "__main__":
+    # Fetch old emails first
     for acc in IMAP_ACCOUNTS:
         fetch_old_emails(acc)
 

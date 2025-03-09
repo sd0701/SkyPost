@@ -8,6 +8,10 @@ pythonw.exe
 *.pyd
 *.pdb
 
+*.bin
+*.pt
+
+
 __pycache__/
 *.log
 
